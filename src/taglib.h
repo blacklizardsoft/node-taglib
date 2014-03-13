@@ -1,11 +1,26 @@
 #ifndef NODE_TAGLIB_H
 #define NODE_TAGLIB_H
 
+
+
+#ifdef _WIN32
+#include "winsock2.h"
+#include <windows.h>
+#endif
+
+
 #include <fileref.h>
 #include <tag.h>
 #include <node.h>
 #include <uv.h>
+
+#ifndef _WIN32
 #include <sys/time.h>
+#endif
+
+#ifdef _WIN32
+#include <time.h>
+#endif
 
 #include <node_version.h>
 
@@ -32,7 +47,12 @@ struct AsyncBaton {
     v8::Persistent<v8::Function> callback;
     int error;
 
-    TagLib::FileName path; /* only used by read/tag, not save */
+#ifdef _WIN32
+    TagLib::FileName* path; /* only used by read/tag, not save */
+#endif
+#ifndef _WIN32
+	TagLib::FileName path; /* only used by read/tag, not save */
+#endif
     // OR
     TagLib::String format;
     BufferStream *stream; // File takes over ownership of the stream
@@ -50,7 +70,12 @@ class CallbackResolver;
 struct AsyncResolverBaton {
     uv_async_t request;
     const CallbackResolver *resolver;
+#ifndef _WIN32
     TagLib::FileName fileName;
+#endif
+#ifdef _WIN32
+    TagLib::FileName* fileName;
+#endif
     TagLib::String type;
     uv_async_t idler;
 };

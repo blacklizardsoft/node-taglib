@@ -202,13 +202,21 @@ v8::Handle<v8::Value> Tag::AsyncTag(const v8::Arguments &args) {
 
     AsyncBaton *baton = new AsyncBaton;
     baton->request.data = baton;
+
+#ifndef _WIN32
     baton->path = 0;
+#endif
     baton->tag = NULL;
     baton->error = 0;
 
     if (args[0]->IsString()) {
         String::Utf8Value path(args[0]->ToString());
+#ifndef _WIN32
         baton->path = strdup(*path);
+#endif
+#ifdef _WIN32
+		baton->path = new TagLib::FileName(*path);
+#endif
         baton->callback = Persistent<Function>::New(Local<Function>::Cast(args[1]));
 
     }
@@ -229,7 +237,13 @@ void Tag::AsyncTagReadDo(uv_work_t *req) {
     TagLib::FileRef *f;
 
     if (baton->path) {
-        baton->error = node_taglib::CreateFileRefPath(baton->path, &f);
+#ifdef _WIN32
+        baton->error = node_taglib::CreateFileRefPath(*baton->path, &f);
+#endif
+#ifndef _WIN32
+		baton->error = node_taglib::CreateFileRefPath(baton->path, &f);
+#endif
+
     }
     else {
         assert(baton->stream);

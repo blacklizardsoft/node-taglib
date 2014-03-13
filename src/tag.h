@@ -1,9 +1,23 @@
 #ifndef NODE_TAGLIB_TAG_H
 #define NODE_TAGLIB_TAG_H
 
+#ifdef _WIN32
+#include "winsock2.h"
+#include <windows.h>
+#endif
+
+
+
 #include <fileref.h>
 #include <node.h>
+
+#ifndef _WIN32
 #include <sys/time.h>
+#endif
+
+#ifdef _WIN32
+#include <time.h>
+#endif
 
 namespace node_taglib {
 class Tag : public node::ObjectWrap {

@@ -186,7 +186,12 @@ v8::Handle<v8::Value> AsyncReadFile(const v8::Arguments &args) {
 
     if (args[0]->IsString()) {
         String::Utf8Value path(args[0]->ToString());
+#ifndef _WIN32
         baton->path = strdup(*path);
+#endif
+#ifdef _WIN32
+		baton->path = new TagLib::FileName(*path);
+#endif
         baton->callback = Persistent<Function>::New(Local<Function>::Cast(args[1]));
 
     }
@@ -207,7 +212,12 @@ void AsyncReadFileDo(uv_work_t *req) {
     TagLib::FileRef *f;
 
     if (baton->path) {
+#ifndef _WIN32
         baton->error = node_taglib::CreateFileRefPath(baton->path, &f);
+#endif
+#ifdef _WIN32
+		baton->error = node_taglib::CreateFileRefPath(*baton->path, &f);
+#endif
     }
     else {
         assert(baton->stream);
@@ -301,7 +311,7 @@ CallbackResolver::CallbackResolver(Persistent<Function> func)
     , resolverFunc(func)
     // the constructor is always called in the v8 thread
 #ifdef _WIN32
-    , created_in(GetCurrentThreadId())
+    , created_in((uv_thread_t)GetCurrentThreadId())
 #else
     , created_in(pthread_self())
 #endif
@@ -324,7 +334,14 @@ void CallbackResolver::stopIdling(uv_async_t *handle, int status)
 void CallbackResolver::invokeResolver(AsyncResolverBaton *baton)
 {
     HandleScope scope;
-    Handle<Value> argv[] = { TagLibStringToString(baton->fileName) };
+    Handle<Value> argv[] = { 
+#ifndef _WIN32
+		TagLibStringToString(baton->fileName) 
+#endif
+#ifdef _WIN32
+		TagLibStringToString(*(const wchar_t*)baton->fileName) 
+#endif
+	};
     Local<Value> ret = baton->resolver->resolverFunc->Call(Context::GetCurrent()->Global(), 1, argv);
     if (!ret->IsString()) {
         baton->type = TagLib::String::null;
@@ -339,10 +356,16 @@ TagLib::File *CallbackResolver::createFile(TagLib::FileName fileName, bool readA
     AsyncResolverBaton baton;
     baton.request.data = (void *) &baton;
     baton.resolver = this;
-    baton.fileName = fileName;
+#ifndef _WIN32
+    baton.fileName = strdup(fileName);
+#endif
+#ifdef _WIN32
+	baton.fileName = new TagLib::FileName(fileName);
+#endif
+
 
 #ifdef _WIN32
-    if (created_in != GetCurrentThreadId()) {
+	if (created_in != (uv_thread_t) GetCurrentThreadId()) {
 #else
     if (created_in != pthread_self()) {
 #endif
@@ -359,6 +382,9 @@ TagLib::File *CallbackResolver::createFile(TagLib::FileName fileName, bool readA
     }
 
     TagLib::FileStream *stream = new TagLib::FileStream(fileName);
+
+	if (baton.fileName)
+		delete baton.fileName;
 
     return node_taglib::createFile(stream, baton.type);
 }
